@@ -1,0 +1,40 @@
+:local botToken "YOUR_BOT_TOKEN"
+:local chatId "YOUR_CHAT_ID"
+
+:local ruleName "drop all not LAN"
+
+# get filter counters
+:local traffic [/ip firewall filter get [find comment=$ruleName] value-name=bytes]
+:local packets [/ip firewall filter get [find comment=$ruleName] value-name=packets]
+
+# get current date
+:local currentDate [/system clock get date]
+
+# convert to human readable size
+:local human do={
+	# Converts a number to SI-Prefix number
+    :local INP [:tonum $1]
+	:local Co 0
+	:while ($INP > 1024) do={
+		:set $INP ($INP/1024)
+		:set $Co ($Co+1)
+	}
+	:return ($INP.[:pick [:toarray "B,KB,MB,GB,TB,PB,EB"] $Co])
+}
+
+# create message
+:local message
+:set message ("ℹ️ Report for " . $currentDate . "\n\n")
+:set message ($message . "Blocked not in LAN: \n")
+:set message ($message . "Traffic: " . [$human $traffic] . "\n")
+:set message ($message . "Packets: " . $packets)
+
+# send message
+/tool fetch \
+  url=("https://api.telegram.org/bot" . $botToken . "/sendMessage") \
+  http-method=post \
+  http-data=("chat_id=" . $chatId . "&text=" . $message) \
+  output=none
+
+# reset counters after sending message
+/ip firewall filter reset-counters [find comment=$ruleName]
